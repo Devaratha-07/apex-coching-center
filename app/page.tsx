@@ -1242,7 +1242,7 @@ export default function App() {
                 type="password" 
                 value={adminPasswordInput} 
                 onChange={(e) => setAdminPasswordInput(e.target.value)} 
-                placeholder="Admin Password (admin123)" 
+                placeholder="Admin Password (Arjun123)" 
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" 
                 required 
               />
