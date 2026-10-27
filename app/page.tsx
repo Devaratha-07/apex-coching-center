@@ -1227,7 +1227,7 @@ export default function App() {
             <form onSubmit={(e) => {
               e.preventDefault();
               // Yahan aap apna Admin Password set kar sakte hain (Abhi ke liye "admin123" rakha hai)
-              if (adminPasswordInput === 'admin123') {
+              if (adminPasswordInput === 'Arjun123') {
                 setIsAdminLoggedIn(true);
                 setShowAdminLoginModal(false);
                 setActiveView('admin');
@@ -1242,7 +1242,7 @@ export default function App() {
                 type="password" 
                 value={adminPasswordInput} 
                 onChange={(e) => setAdminPasswordInput(e.target.value)} 
-                placeholder="Admin Password (Arjun123)" 
+                placeholder="Admin Password (----)"
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" 
                 required 
               />
