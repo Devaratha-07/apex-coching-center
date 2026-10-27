@@ -297,6 +297,9 @@ const loadStorage = <T,>(key: string, fallback: T): T => {
 export default function App() {
   const [activeView, setActiveView] = useState<'landing' | 'student' | 'admin'>('landing');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
 
   const [batches, setBatches] = useState<Batch[]>(() => loadStorage('takshashila_batches_v1', INITIAL_BATCHES));
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => loadStorage('takshashila_materials_v1', INITIAL_STUDY_MATERIALS));
@@ -624,7 +627,17 @@ export default function App() {
             <button onClick={() => setActiveView('student')} className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${activeView === 'student' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:text-white'}`}>
               <PlayCircle className="w-3.5 h-3.5" /> Student Portal <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeView === 'student' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500/20 text-amber-400'}`}>{enrolledBatchIds.length}</span>
             </button>
-            <button onClick={() => setActiveView('admin')} className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${activeView === 'admin' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:text-white'}`}>
+            {/* 🔒 PROTECTED ADMIN BUTTON */}
+            <button 
+              onClick={() => {
+                if (isAdminLoggedIn) {
+                  setActiveView('admin');
+                } else {
+                  setShowAdminLoginModal(true);
+                }
+              }} 
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${activeView === 'admin' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:text-white'}`}
+            >
               <BarChart3 className="w-3.5 h-3.5" /> Admin Panel {pendingEnquiriesCount > 0 && <span className="bg-rose-500 text-white text-[10px] px-1.5 rounded-full font-extrabold">{pendingEnquiriesCount}</span>}
             </button>
           </nav>
@@ -645,7 +658,14 @@ export default function App() {
             <div className="grid grid-cols-3 gap-1.5 bg-slate-900 p-1.5 rounded-xl">
               <button onClick={() => { setActiveView('landing'); setMobileMenuOpen(false); }} className={`py-2 rounded-lg text-xs font-extrabold ${activeView === 'landing' ? 'bg-amber-500 text-slate-950' : 'text-slate-300'}`}>Website</button>
               <button onClick={() => { setActiveView('student'); setMobileMenuOpen(false); }} className={`py-2 rounded-lg text-xs font-extrabold ${activeView === 'student' ? 'bg-amber-500 text-slate-950' : 'text-slate-300'}`}>Student</button>
-              <button onClick={() => { setActiveView('admin'); setMobileMenuOpen(false); }} className={`py-2 rounded-lg text-xs font-extrabold ${activeView === 'admin' ? 'bg-amber-500 text-slate-950' : 'text-slate-300'}`}>Admin</button>
+              <button onClick={() => { 
+                if (isAdminLoggedIn) {
+                  setActiveView('admin');
+                } else {
+                  setShowAdminLoginModal(true);
+                }
+                setMobileMenuOpen(false); 
+              }} className={`py-2 rounded-lg text-xs font-extrabold ${activeView === 'admin' ? 'bg-amber-500 text-slate-950' : 'text-slate-300'}`}>Admin</button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {classOptions.map((cls) => (<button key={cls} onClick={() => { handleNavbarClassSelect(cls); setMobileMenuOpen(false); }} className="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-400 text-xs font-bold border border-slate-800">{cls}</button>))}
@@ -833,7 +853,14 @@ export default function App() {
                   <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mt-2">Study Material & Admin-Uploaded PDF Vault</h2>
                   <p className="text-slate-600 text-sm sm:text-base mt-1">Every PDF uploaded by Admin in the Admin Panel immediately appears here.</p>
                 </div>
-                <button onClick={() => { setActiveView('admin'); setAdminTab('pdfs'); }} className="bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-extrabold px-4 py-2.5 rounded-xl flex items-center gap-2 self-start sm:self-auto"><Upload className="w-4 h-4" /> Upload New PDF (Admin)</button>
+                <button onClick={() => { 
+                  if (isAdminLoggedIn) {
+                    setActiveView('admin'); 
+                    setAdminTab('pdfs');
+                  } else {
+                    setShowAdminLoginModal(true);
+                  }
+                }} className="bg-slate-900 hover:bg-slate-800 text-amber-400 text-xs font-extrabold px-4 py-2.5 rounded-xl flex items-center gap-2 self-start sm:self-auto"><Upload className="w-4 h-4" /> Upload New PDF (Admin)</button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {studyMaterials.map((item) => (
@@ -1184,6 +1211,44 @@ export default function App() {
               <div><label className="text-xs font-bold text-slate-600 block mb-1">Batch Title *</label><input type="text" value={batchForm.title} onChange={(e) => setBatchForm({ ...batchForm, title: e.target.value })} placeholder="Batch Title" className="w-full px-3.5 py-2 border rounded-xl text-sm" required /></div>
               <div className="grid grid-cols-2 gap-2"><select value={batchForm.targetClass} onChange={(e) => setBatchForm({ ...batchForm, targetClass: e.target.value })} className="px-3 py-2 border rounded-xl text-xs font-bold"><option value="Class 10th">Class 10th</option><option value="Class 12th Science">Class 12th Science</option><option value="Class 12th Commerce">Class 12th Commerce</option></select><input type="number" value={batchForm.price} onChange={(e) => setBatchForm({ ...batchForm, price: Number(e.target.value) })} placeholder="Fee (₹)" className="px-3 py-2 border rounded-xl text-sm" required /></div>
               <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowBatchModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600">Cancel</button><button type="submit" className="px-5 py-2.5 bg-amber-500 text-slate-950 text-xs font-extrabold rounded-xl shadow-md">Save Changes</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔒 ADMIN LOGIN MODAL */}
+      {showAdminLoginModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-amber-500 text-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-lg font-extrabold text-amber-400">Admin Login</h3>
+              <button onClick={() => setShowAdminLoginModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              // Yahan aap apna Admin Password set kar sakte hain (Abhi ke liye "admin123" rakha hai)
+              if (adminPasswordInput === 'admin123') {
+                setIsAdminLoggedIn(true);
+                setShowAdminLoginModal(false);
+                setActiveView('admin');
+                setAdminPasswordInput('');
+                triggerToast('Admin Login Successful!');
+              } else {
+                alert('Galat Password hai! Kripya sahi password dalein.');
+              }
+            }} className="space-y-3.5">
+              <p className="text-xs text-slate-300">Admin panel access karne ke liye password darj karein:</p>
+              <input 
+                type="password" 
+                value={adminPasswordInput} 
+                onChange={(e) => setAdminPasswordInput(e.target.value)} 
+                placeholder="Admin Password (admin123)" 
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" 
+                required 
+              />
+              <button type="submit" className="w-full text-slate-950 font-extrabold py-3 rounded-xl text-sm bg-amber-500 hover:bg-amber-400 transition">
+                Login as Admin
+              </button>
             </form>
           </div>
         </div>
