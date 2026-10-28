@@ -42,7 +42,9 @@ import {
   FileUp,
   CheckCircle,
   HelpCircle,
-  Trophy
+  Trophy,
+  Video,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface QuizQuestion {
@@ -294,6 +296,14 @@ const loadStorage = <T,>(key: string, fallback: T): T => {
   }
 };
 
+// Helper function to convert YouTube links to embeddable URLs
+const getYouTubeEmbedUrl = (url: string): string | null => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? `https://www.youtube.com/embed/${match[2]}` : null;
+};
+
 export default function App() {
   const [activeView, setActiveView] = useState<'landing' | 'student' | 'admin'>('landing');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -369,7 +379,37 @@ export default function App() {
   const [studentStatusFilter, setStudentStatusFilter] = useState('All');
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
-  const [batchForm, setBatchForm] = useState({ title: '', targetClass: 'Class 12th Science', stream: 'Science (PCM / PCB)', mode: 'Offline + Online Hybrid', timings: '4:00 PM - 6:30 PM', price: 4499, description: '', lectureSubject: 'Physics', lectureTitle: '', lectureDuration: '55:00' });
+  const [batchForm, setBatchForm] = useState({
+    title: '',
+    targetClass: 'Class 12th Science',
+    stream: 'Science (PCM / PCB)',
+    mode: 'Offline + Online Hybrid',
+    timings: '4:00 PM - 6:30 PM',
+    price: 4499,
+    description: '',
+    lectureSubject: 'Physics',
+    lectureTitle: '',
+    lectureFaculty: 'Er. Saurabh Mishra',
+    lectureDuration: '55:00',
+    lectureVideoUrl: ''
+  });
+  const batchVideoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dedicated Video Upload Modal States
+  const [showVideoUploadModal, setShowVideoUploadModal] = useState(false);
+  const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'file'>('url');
+  const [videoUploadForm, setVideoUploadForm] = useState({
+    batchId: 'batch-10-aarambh',
+    subject: 'Maths',
+    title: '',
+    faculty: 'Er. Saurabh Mishra',
+    duration: '45:00',
+    videoUrl: '',
+    videoFileName: '',
+    pdfName: 'Class_Notes.pdf',
+    dppName: 'Chapter_DPP.pdf'
+  });
+  const dedicatedVideoFileRef = useRef<HTMLInputElement>(null);
 
   const [pdfUploadForm, setPdfUploadForm] = useState({ title: '', targetClass: 'Class 10th', subject: 'Maths', category: 'Handwritten Notes', fileName: '', fileDataUrl: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -522,24 +562,224 @@ export default function App() {
   const toggleStudentFee = (id: string) => { setStudentRecords((prev) => prev.map((s) => (s.id === id ? { ...s, feeStatus: s.feeStatus === 'Paid' ? 'Pending' : 'Paid' } : s))); triggerToast('Fee status updated.'); };
   const cycleEnquiry = (id: string) => { const states: Array<'Pending Call' | 'Demo Scheduled' | 'Enrolled'> = ['Pending Call', 'Demo Scheduled', 'Enrolled']; setEnquiries((prev) => prev.map((e) => { if (e.id !== id) return e; const next = (states.indexOf(e.status) + 1) % states.length; return { ...e, status: states[next] }; })); triggerToast('Lead status updated.'); };
 
-  const openAddBatch = () => { setEditingBatch(null); setBatchForm({ title: '', targetClass: 'Class 12th Science', stream: 'Science (PCM / PCB)', mode: 'Offline + Online Hybrid', timings: '4:00 PM - 6:30 PM', price: 4499, description: '', lectureSubject: 'Physics', lectureTitle: '', lectureDuration: '55:00' }); setShowBatchModal(true); };
-  const openEditBatch = (b: Batch) => { setEditingBatch(b); setBatchForm({ title: b.title, targetClass: b.targetClass, stream: b.stream, mode: b.mode, timings: b.timings, price: b.price, description: b.description, lectureSubject: b.subjects[0] || 'Physics', lectureTitle: '', lectureDuration: '50:00' }); setShowBatchModal(true); };
+  const openAddBatch = () => {
+    setEditingBatch(null);
+    setBatchForm({
+      title: '',
+      targetClass: 'Class 12th Science',
+      stream: 'Science (PCM / PCB)',
+      mode: 'Offline + Online Hybrid',
+      timings: '4:00 PM - 6:30 PM',
+      price: 4499,
+      description: '',
+      lectureSubject: 'Physics',
+      lectureTitle: '',
+      lectureFaculty: 'Er. Saurabh Mishra',
+      lectureDuration: '55:00',
+      lectureVideoUrl: ''
+    });
+    setShowBatchModal(true);
+  };
+
+  const openEditBatch = (b: Batch) => {
+    setEditingBatch(b);
+    setBatchForm({
+      title: b.title,
+      targetClass: b.targetClass,
+      stream: b.stream,
+      mode: b.mode,
+      timings: b.timings,
+      price: b.price,
+      description: b.description,
+      lectureSubject: b.subjects[0] || 'Physics',
+      lectureTitle: '',
+      lectureFaculty: 'Er. Saurabh Mishra',
+      lectureDuration: '50:00',
+      lectureVideoUrl: ''
+    });
+    setShowBatchModal(true);
+  };
+
+  // Handle video file selection inside Batch Create/Edit Modal
+  const handleBatchVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const blobUrl = URL.createObjectURL(file);
+    setBatchForm((prev) => ({
+      ...prev,
+      lectureVideoUrl: blobUrl,
+      lectureTitle: prev.lectureTitle || file.name.replace(/\.[^/.]+$/, '')
+    }));
+    triggerToast(`Video File Selected: ${file.name}`);
+  };
+
+  // Handle video file selection inside Dedicated Video Upload Modal
+  const handleDedicatedVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const blobUrl = URL.createObjectURL(file);
+    setVideoUploadForm((prev) => ({
+      ...prev,
+      videoUrl: blobUrl,
+      videoFileName: file.name,
+      title: prev.title || file.name.replace(/\.[^/.]+$/, '')
+    }));
+    triggerToast(`Video Selected: ${file.name}`);
+  };
+
+  const openVideoUploadForBatch = (batch: Batch) => {
+    setVideoUploadForm({
+      batchId: batch.id,
+      subject: batch.subjects[0] || 'Physics',
+      title: '',
+      faculty: 'Er. Saurabh Mishra',
+      duration: '50:00',
+      videoUrl: '',
+      videoFileName: '',
+      pdfName: 'Lecture_Notes.pdf',
+      dppName: 'DPP_Sheet.pdf'
+    });
+    setVideoUploadMode('url');
+    setShowVideoUploadModal(true);
+  };
+
+  const handleUploadLectureToBatch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!videoUploadForm.title.trim()) {
+      triggerToast('Kripya Lecture Title darj karein!');
+      return;
+    }
+    const finalVideoUrl = videoUploadForm.videoUrl.trim() || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    const newLesson: Lesson = {
+      id: `l-${Date.now()}`,
+      subject: videoUploadForm.subject || 'General',
+      title: videoUploadForm.title,
+      faculty: videoUploadForm.faculty || 'Takshashila Faculty',
+      duration: videoUploadForm.duration || '45:00',
+      videoUrl: finalVideoUrl,
+      pdfName: videoUploadForm.pdfName || 'Class_Notes.pdf',
+      dppName: videoUploadForm.dppName || 'DPP_Practice.pdf',
+      completed: false,
+      quiz: [
+        {
+          id: `q-${Date.now()}`,
+          question: `Important Board MCQ from ${videoUploadForm.title}:`,
+          options: ['Concept A', 'Concept B', 'Both A & B', 'None of these'],
+          answer: 2,
+          solution: 'Refer to the lecture explanation and class PDF notes.'
+        }
+      ]
+    };
+
+    setBatches((prev) =>
+      prev.map((b) => {
+        if (b.id !== videoUploadForm.batchId) return b;
+        const updatedSubjects = b.subjects.includes(videoUploadForm.subject)
+          ? b.subjects
+          : [...b.subjects, videoUploadForm.subject];
+        return {
+          ...b,
+          subjects: updatedSubjects,
+          lessons: [...b.lessons, newLesson]
+        };
+      })
+    );
+
+    if (!enrolledBatchIds.includes(videoUploadForm.batchId)) {
+      setEnrolledBatchIds((prev) => [...prev, videoUploadForm.batchId]);
+    }
+    setActiveBatchId(videoUploadForm.batchId);
+    setActiveLessonId(newLesson.id);
+    setShowVideoUploadModal(false);
+    triggerToast('Video Lecture Uploaded Successfully! Ab Student Portal mein live hai.');
+  };
+
+  const handleDeleteLesson = (batchId: string, lessonId: string) => {
+    setBatches((prev) =>
+      prev.map((b) => {
+        if (b.id !== batchId) return b;
+        if (b.lessons.length <= 1) {
+          triggerToast('Batch mein kam se kam 1 video lecture hona chahiye.');
+          return b;
+        }
+        return { ...b, lessons: b.lessons.filter((l) => l.id !== lessonId) };
+      })
+    );
+  };
 
   const handleSaveBatch = (e: React.FormEvent) => {
-    e.preventDefault(); if (!batchForm.title.trim()) return;
+    e.preventDefault();
+    if (!batchForm.title.trim()) return;
+    const finalVideoUrl = batchForm.lectureVideoUrl.trim() || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
     if (editingBatch) {
-      setBatches((prev) => prev.map((b) => {
-        if (b.id !== editingBatch.id) return b;
-        const lessons = [...b.lessons];
-        if (batchForm.lectureTitle.trim()) {
-          lessons.push({ id: `l-${Date.now()}`, subject: batchForm.lectureSubject, title: batchForm.lectureTitle, faculty: 'Er. Saurabh Mishra', duration: batchForm.lectureDuration, videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', pdfName: 'Notes.pdf', dppName: 'DPP.pdf', completed: false, quiz: [{ id: `q-${Date.now()}`, question: 'Sample board question:', options: ['A', 'B', 'C', 'D'], answer: 0, solution: 'NCERT derivation.' }] });
-        }
-        return { ...b, title: batchForm.title, targetClass: batchForm.targetClass, stream: batchForm.stream, mode: batchForm.mode, timings: batchForm.timings, price: Number(batchForm.price), description: batchForm.description, lessons };
-      }));
-      triggerToast('Batch updated!');
+      setBatches((prev) =>
+        prev.map((b) => {
+          if (b.id !== editingBatch.id) return b;
+          const lessons = [...b.lessons];
+          if (batchForm.lectureTitle.trim()) {
+            lessons.push({
+              id: `l-${Date.now()}`,
+              subject: batchForm.lectureSubject || 'Physics',
+              title: batchForm.lectureTitle,
+              faculty: batchForm.lectureFaculty || 'Er. Saurabh Mishra',
+              duration: batchForm.lectureDuration || '50:00',
+              videoUrl: finalVideoUrl,
+              pdfName: 'Notes.pdf',
+              dppName: 'DPP.pdf',
+              completed: false,
+              quiz: [{ id: `q-${Date.now()}`, question: 'Sample board question:', options: ['A', 'B', 'C', 'D'], answer: 0, solution: 'NCERT derivation.' }]
+            });
+          }
+          return {
+            ...b,
+            title: batchForm.title,
+            targetClass: batchForm.targetClass,
+            stream: batchForm.stream,
+            mode: batchForm.mode,
+            timings: batchForm.timings,
+            price: Number(batchForm.price),
+            description: batchForm.description,
+            lessons
+          };
+        })
+      );
+      triggerToast(batchForm.lectureTitle.trim() ? 'Batch & New Video Lecture Updated!' : 'Batch updated!');
     } else {
-      const nb: Batch = { id: `batch-${Date.now()}`, title: batchForm.title, targetClass: batchForm.targetClass, stream: batchForm.stream, mode: batchForm.mode, timings: batchForm.timings, subjects: ['Physics', 'Chemistry', 'Maths'], price: Number(batchForm.price) || 3999, oldPrice: 7999, rating: 5.0, enrolledCount: 1, liveTag: 'NEW BATCH', image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80', description: batchForm.description || 'Complete offline & online coaching.', syllabus: [{ unit: 'Unit 1: Core Syllabus', subject: batchForm.lectureSubject, chapters: ['Chapter 1: Concepts', 'Chapter 2: Board PYQs'], weightage: '40 Marks' }], lessons: [{ id: `l-${Date.now()}`, subject: batchForm.lectureSubject, title: batchForm.lectureTitle || 'Ch 1: Introduction & Blueprint', faculty: 'Er. Saurabh Mishra', duration: batchForm.lectureDuration, videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', pdfName: 'Notes.pdf', dppName: 'DPP.pdf', completed: false, quiz: [{ id: `q-${Date.now()}`, question: 'Primary book for preparation?', options: ['NCERT + PYQs', 'Magazines', 'None', 'Guides'], answer: 0, solution: 'NCERT is mandatory.' }] }] };
-      setBatches((prev) => [nb, ...prev]); setEnrolledBatchIds((prev) => [...prev, nb.id]); triggerToast('Batch created and unlocked!');
+      const nb: Batch = {
+        id: `batch-${Date.now()}`,
+        title: batchForm.title,
+        targetClass: batchForm.targetClass,
+        stream: batchForm.stream,
+        mode: batchForm.mode,
+        timings: batchForm.timings,
+        subjects: [batchForm.lectureSubject || 'Physics', 'Chemistry', 'Maths'],
+        price: Number(batchForm.price) || 3999,
+        oldPrice: 7999,
+        rating: 5.0,
+        enrolledCount: 1,
+        liveTag: 'NEW BATCH',
+        image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80',
+        description: batchForm.description || 'Complete offline & online coaching.',
+        syllabus: [{ unit: 'Unit 1: Core Syllabus', subject: batchForm.lectureSubject, chapters: ['Chapter 1: Concepts', 'Chapter 2: Board PYQs'], weightage: '40 Marks' }],
+        lessons: [
+          {
+            id: `l-${Date.now()}`,
+            subject: batchForm.lectureSubject || 'Physics',
+            title: batchForm.lectureTitle || 'Ch 1: Introduction & Blueprint',
+            faculty: batchForm.lectureFaculty || 'Er. Saurabh Mishra',
+            duration: batchForm.lectureDuration || '55:00',
+            videoUrl: finalVideoUrl,
+            pdfName: 'Notes.pdf',
+            dppName: 'DPP.pdf',
+            completed: false,
+            quiz: [{ id: `q-${Date.now()}`, question: 'Primary book for preparation?', options: ['NCERT + PYQs', 'Magazines', 'None', 'Guides'], answer: 0, solution: 'NCERT is mandatory.' }]
+          }
+        ]
+      };
+      setBatches((prev) => [nb, ...prev]);
+      setEnrolledBatchIds((prev) => [...prev, nb.id]);
+      triggerToast('New Batch & Video Lecture Created!');
     }
     setShowBatchModal(false);
   };
@@ -568,6 +808,8 @@ export default function App() {
     { title: 'Class 10th Maths: Trigonometry Identities & Board PYQs', faculty: 'Er. Rajesh Verma (IIT Roorkee)', targetClass: 'Class 10th', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4' },
     { title: 'Class 12th Accountancy: Partnership Fundamentals', faculty: 'CA Sidharth Bansal (AIR-18)', targetClass: 'Class 12th Commerce', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' }
   ];
+
+  const activeYoutubeEmbed = getYouTubeEmbedUrl(activeLesson?.videoUrl || '');
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
@@ -627,7 +869,6 @@ export default function App() {
             <button onClick={() => setActiveView('student')} className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 ${activeView === 'student' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-300 hover:text-white'}`}>
               <PlayCircle className="w-3.5 h-3.5" /> Student Portal <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${activeView === 'student' ? 'bg-slate-950 text-amber-400' : 'bg-amber-500/20 text-amber-400'}`}>{enrolledBatchIds.length}</span>
             </button>
-            {/* 🔒 PROTECTED ADMIN BUTTON */}
             <button 
               onClick={() => {
                 if (isAdminLoggedIn) {
@@ -824,7 +1065,10 @@ export default function App() {
                     </div>
                     <div className="p-6 flex-1 flex flex-col justify-between space-y-5">
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between text-xs"><span className="font-bold text-slate-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-600" /> {batch.timings}</span></div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-600" /> {batch.timings}</span>
+                          <span className="font-extrabold text-blue-700 bg-blue-50 px-2 py-1 rounded">{batch.lessons.length} Video Lectures</span>
+                        </div>
                         <h3 className="font-extrabold text-xl text-slate-900 leading-snug">{batch.title}</h3>
                         <p className="text-slate-600 text-sm leading-relaxed">{batch.description}</p>
                       </div>
@@ -949,9 +1193,31 @@ export default function App() {
 
           <div className="flex-1 flex flex-col lg:flex-row">
             <main className="flex-1 flex flex-col">
+              {/* Supports both YouTube Embed and Direct/Local Video Files */}
               <div className="w-full aspect-video max-h-[480px] bg-black relative flex items-center justify-center border-b border-slate-800">
-                <video ref={videoRef} key={activeLesson?.id} controls className="w-full h-full object-contain" poster={activeBatch?.image}><source src={activeLesson?.videoUrl} type="video/mp4" />Your browser does not support video.</video>
+                {activeYoutubeEmbed ? (
+                  <iframe
+                    key={activeLesson?.id}
+                    src={activeYoutubeEmbed}
+                    title={activeLesson?.title || 'Batch Video'}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    ref={videoRef}
+                    key={activeLesson?.id + (activeLesson?.videoUrl || '')}
+                    controls
+                    className="w-full h-full object-contain"
+                    poster={activeBatch?.image}
+                    src={activeLesson?.videoUrl}
+                  >
+                    Your browser does not support video.
+                  </video>
+                )}
               </div>
+
               <div className="p-4 sm:p-8 max-w-4xl w-full mx-auto space-y-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
                   <div>
@@ -959,7 +1225,9 @@ export default function App() {
                     <h1 className="text-xl sm:text-2xl font-extrabold mt-2 text-white">{activeLesson?.title}</h1>
                     <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 mt-2">
                       <span>Duration: {activeLesson?.duration}</span>
-                      <div className="flex items-center gap-1.5"><span className="font-bold text-slate-300">Speed:</span>{['1x', '1.25x', '1.5x', '2x'].map((spd) => (<button key={spd} onClick={() => handlePlaybackSpeedChange(spd)} className={`px-2.5 py-0.5 rounded font-extrabold transition ${playbackSpeed === spd ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>{spd}</button>))}</div>
+                      {!activeYoutubeEmbed && (
+                        <div className="flex items-center gap-1.5"><span className="font-bold text-slate-300">Speed:</span>{['1x', '1.25x', '1.5x', '2x'].map((spd) => (<button key={spd} onClick={() => handlePlaybackSpeedChange(spd)} className={`px-2.5 py-0.5 rounded font-extrabold transition ${playbackSpeed === spd ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>{spd}</button>))}</div>
+                      )}
                     </div>
                   </div>
                   <button onClick={() => activeLesson && toggleLessonComplete(activeLesson.id)} className={`px-5 py-3 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition shrink-0 ${activeLesson?.completed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg'}`}>
@@ -1041,9 +1309,15 @@ export default function App() {
               <div>
                 <span className="text-xs font-extrabold uppercase tracking-widest text-amber-400">Takshashila Backend Command Center</span>
                 <h1 className="text-2xl sm:text-3xl font-extrabold mt-1">Admin Panel</h1>
-                <p className="text-slate-300 text-sm mt-0.5">Upload Real PDFs, Build Mock Tests, Manage Batches, and Track Student Fees.</p>
+                <p className="text-slate-300 text-sm mt-0.5">Upload Batch Videos, Real PDFs, Build Mock Tests, Manage Batches & Track Fees.</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => openVideoUploadForBatch(batches[0])}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm shadow-md"
+                >
+                  <Video className="w-4 h-4" /> + Upload Batch Video
+                </button>
                 <button onClick={() => setAdminTab('pdfs')} className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm"><Upload className="w-4 h-4" /> Upload PDF</button>
                 <button onClick={openAddBatch} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm shadow-md"><PlusCircle className="w-4 h-4" /> + New Batch</button>
               </div>
@@ -1057,7 +1331,7 @@ export default function App() {
             </div>
 
             <div className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
-              <button onClick={() => setAdminTab('batches')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'batches' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>1. Batches & Lectures ({batches.length})</button>
+              <button onClick={() => setAdminTab('batches')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'batches' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>1. Batches & Video Lectures ({batches.length})</button>
               <button onClick={() => setAdminTab('pdfs')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'pdfs' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>2. Upload PDF Notes ({studyMaterials.length})</button>
               <button onClick={() => setAdminTab('mocktests')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'mocktests' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>3. Mock Test Builder</button>
               <button onClick={() => setAdminTab('students')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'students' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>4. Registered Students ({studentRecords.length})</button>
@@ -1065,9 +1339,104 @@ export default function App() {
             </div>
 
             {adminTab === 'batches' && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-200 flex justify-between items-center"><h2 className="font-extrabold text-lg text-slate-900">Manage Batches & Lectures</h2><button onClick={openAddBatch} className="bg-slate-900 text-amber-400 px-4 py-2 rounded-xl text-xs font-extrabold">+ Add Batch</button></div>
-                <div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-slate-900 text-amber-400 text-xs uppercase"><th className="py-3.5 px-5">Class</th><th className="py-3.5 px-5">Batch Title</th><th className="py-3.5 px-5">Timings</th><th className="py-3.5 px-5">Fee</th><th className="py-3.5 px-5 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-200 text-sm">{batches.map((b) => (<tr key={b.id} className="hover:bg-amber-50/30"><td className="py-4 px-5"><span className="bg-slate-900 text-amber-400 text-xs font-extrabold px-2.5 py-1 rounded whitespace-nowrap">{b.targetClass}</span></td><td className="py-4 px-5 font-bold text-slate-900">{b.title}</td><td className="py-4 px-5 text-xs text-slate-600">{b.timings}</td><td className="py-4 px-5 font-extrabold">₹{b.price.toLocaleString('en-IN')}</td><td className="py-4 px-5 text-right space-x-2 whitespace-nowrap"><button onClick={() => openEditBatch(b)} className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-extrabold inline-flex items-center gap-1"><Edit className="w-3.5 h-3.5" /> Edit</button><button onClick={() => deleteBatch(b.id)} className="text-rose-600 p-1.5"><Trash2 className="w-4 h-4" /></button></td></tr>))}</tbody></table></div>
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+                    <div>
+                      <h2 className="font-extrabold text-lg text-slate-900">Manage Batches & Upload Video Lectures</h2>
+                      <p className="text-xs text-slate-500">Har batch ke aage "+ Upload Video" button daba kar naya video lecture add karein.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => openVideoUploadForBatch(batches[0])} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
+                        <Video className="w-4 h-4" /> + Upload Video Lecture
+                      </button>
+                      <button onClick={openAddBatch} className="bg-slate-900 text-amber-400 px-4 py-2 rounded-xl text-xs font-extrabold">+ Add Batch</button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-900 text-amber-400 text-xs uppercase">
+                          <th className="py-3.5 px-5">Class</th>
+                          <th className="py-3.5 px-5">Batch Title</th>
+                          <th className="py-3.5 px-5">Videos</th>
+                          <th className="py-3.5 px-5">Fee</th>
+                          <th className="py-3.5 px-5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-sm">
+                        {batches.map((b) => (
+                          <tr key={b.id} className="hover:bg-amber-50/30">
+                            <td className="py-4 px-5"><span className="bg-slate-900 text-amber-400 text-xs font-extrabold px-2.5 py-1 rounded whitespace-nowrap">{b.targetClass}</span></td>
+                            <td className="py-4 px-5">
+                              <p className="font-bold text-slate-900">{b.title}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{b.timings}</p>
+                            </td>
+                            <td className="py-4 px-5">
+                              <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-lg">
+                                {b.lessons.length} Videos
+                              </span>
+                            </td>
+                            <td className="py-4 px-5 font-extrabold">₹{b.price.toLocaleString('en-IN')}</td>
+                            <td className="py-4 px-5 text-right space-x-2 whitespace-nowrap">
+                              <button
+                                onClick={() => openVideoUploadForBatch(b)}
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-extrabold inline-flex items-center gap-1 shadow-sm"
+                              >
+                                <Video className="w-3.5 h-3.5" /> + Upload Video
+                              </button>
+                              <button onClick={() => openEditBatch(b)} className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-extrabold inline-flex items-center gap-1"><Edit className="w-3.5 h-3.5" /> Edit</button>
+                              <button onClick={() => deleteBatch(b.id)} className="text-rose-600 p-1.5"><Trash2 className="w-4 h-4" /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Batch-wise Uploaded Video Lectures List */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                  <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                    <PlayCircle className="w-5 h-5 text-amber-500" /> All Uploaded Batch Video Lectures
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {batches.map((b) => (
+                      <div key={b.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                          <div>
+                            <span className="text-[10px] font-extrabold uppercase text-amber-600 block">{b.targetClass}</span>
+                            <h4 className="font-extrabold text-sm text-slate-900 line-clamp-1">{b.title.split(':')[0]}</h4>
+                          </div>
+                          <button
+                            onClick={() => openVideoUploadForBatch(b)}
+                            className="text-xs font-extrabold bg-slate-900 text-amber-400 px-2.5 py-1 rounded-lg"
+                          >
+                            + Add Video
+                          </button>
+                        </div>
+                        <div className="space-y-2 max-h-56 overflow-y-auto">
+                          {b.lessons.map((l, idx) => (
+                            <div key={l.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-start justify-between gap-2 text-xs">
+                              <div className="min-w-0">
+                                <span className="text-[10px] font-extrabold text-blue-700 uppercase">{l.subject} • {l.duration}</span>
+                                <p className="font-bold text-slate-900 truncate">{idx + 1}. {l.title}</p>
+                                <p className="text-[11px] text-slate-500 truncate">{l.faculty}</p>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteLesson(b.id, l.id)}
+                                className="text-rose-500 hover:text-rose-700 p-1 shrink-0"
+                                title="Delete Video"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1202,15 +1571,256 @@ export default function App() {
         </div>
       )}
 
-      {/* Admin Batch Modal */}
+      {/* 🎥 DEDICATED BATCH VIDEO UPLOAD MODAL */}
+      {showVideoUploadModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-2 border-emerald-500 text-slate-950 my-8">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                  <Video className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold">Upload Video Lecture to Batch</h3>
+                  <p className="text-xs text-slate-500">Video upload hote hi Student Portal mein dikhega</p>
+                </div>
+              </div>
+              <button onClick={() => setShowVideoUploadModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUploadLectureToBatch} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Select Batch *</label>
+                <select
+                  value={videoUploadForm.batchId}
+                  onChange={(e) => setVideoUploadForm({ ...videoUploadForm, batchId: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-extrabold bg-slate-50"
+                >
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.targetClass} — {b.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Subject *</label>
+                  <input
+                    type="text"
+                    value={videoUploadForm.subject}
+                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, subject: e.target.value })}
+                    placeholder="e.g. Physics, Maths, Accounts"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Faculty Name</label>
+                  <input
+                    type="text"
+                    value={videoUploadForm.faculty}
+                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, faculty: e.target.value })}
+                    placeholder="e.g. Er. Saurabh Mishra"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Lecture Title *</label>
+                  <input
+                    type="text"
+                    value={videoUploadForm.title}
+                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, title: e.target.value })}
+                    placeholder="e.g. Ch 3: Current Electricity - Kirchoff Law"
+                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Duration</label>
+                  <input
+                    type="text"
+                    value={videoUploadForm.duration}
+                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, duration: e.target.value })}
+                    placeholder="45:00"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Video Source Selector */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-extrabold text-slate-800">Choose Video Upload Method:</label>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setVideoUploadMode('url')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 ${
+                        videoUploadMode === 'url' ? 'bg-slate-900 text-amber-400' : 'bg-white border text-slate-600'
+                      }`}
+                    >
+                      <LinkIcon className="w-3 h-3" /> YouTube / Video Link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVideoUploadMode('file')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 ${
+                        videoUploadMode === 'file' ? 'bg-slate-900 text-amber-400' : 'bg-white border text-slate-600'
+                      }`}
+                    >
+                      <Upload className="w-3 h-3" /> Select Video File
+                    </button>
+                  </div>
+                </div>
+
+                {videoUploadMode === 'url' ? (
+                  <div>
+                    <input
+                      type="url"
+                      value={videoUploadForm.videoUrl}
+                      onChange={(e) => setVideoUploadForm({ ...videoUploadForm, videoUrl: e.target.value })}
+                      placeholder="Paste YouTube URL (https://youtu.be/...) or Direct .mp4 link"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-white"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Tip: YouTube Unlisted/Public link ya direct MP4 video link paste karein.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      ref={dedicatedVideoFileRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/*"
+                      onChange={handleDedicatedVideoFileSelect}
+                      className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-600 file:text-white border border-slate-300 rounded-xl p-1.5 bg-white"
+                    />
+                    {videoUploadForm.videoFileName && (
+                      <p className="text-xs font-bold text-emerald-700 mt-1.5">
+                        ✓ Selected Video: {videoUploadForm.videoFileName}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowVideoUploadModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-extrabold rounded-xl shadow-md flex items-center gap-1.5"
+                >
+                  <Upload className="w-4 h-4" /> Publish Video to Batch
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Batch Modal (Enhanced with Video Upload Support) */}
       {showBatchModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-2 border-amber-500 text-slate-950">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3"><h3 className="text-lg font-extrabold">{editingBatch ? 'Edit Batch' : 'Create New Batch'}</h3><button onClick={() => setShowBatchModal(false)} className="text-slate-400"><X className="w-5 h-5" /></button></div>
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-2 border-amber-500 text-slate-950 my-8">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-extrabold">{editingBatch ? 'Edit Batch & Add Video Lecture' : 'Create New Batch & Upload Video'}</h3>
+              <button onClick={() => setShowBatchModal(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
+            </div>
             <form onSubmit={handleSaveBatch} className="space-y-3">
-              <div><label className="text-xs font-bold text-slate-600 block mb-1">Batch Title *</label><input type="text" value={batchForm.title} onChange={(e) => setBatchForm({ ...batchForm, title: e.target.value })} placeholder="Batch Title" className="w-full px-3.5 py-2 border rounded-xl text-sm" required /></div>
-              <div className="grid grid-cols-2 gap-2"><select value={batchForm.targetClass} onChange={(e) => setBatchForm({ ...batchForm, targetClass: e.target.value })} className="px-3 py-2 border rounded-xl text-xs font-bold"><option value="Class 10th">Class 10th</option><option value="Class 12th Science">Class 12th Science</option><option value="Class 12th Commerce">Class 12th Commerce</option></select><input type="number" value={batchForm.price} onChange={(e) => setBatchForm({ ...batchForm, price: Number(e.target.value) })} placeholder="Fee (₹)" className="px-3 py-2 border rounded-xl text-sm" required /></div>
-              <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowBatchModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600">Cancel</button><button type="submit" className="px-5 py-2.5 bg-amber-500 text-slate-950 text-xs font-extrabold rounded-xl shadow-md">Save Changes</button></div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Batch Title *</label>
+                <input type="text" value={batchForm.title} onChange={(e) => setBatchForm({ ...batchForm, title: e.target.value })} placeholder="e.g. Sankalp Batch: Class 10th Science & Maths" className="w-full px-3.5 py-2 border rounded-xl text-sm" required />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Target Class</label>
+                  <select value={batchForm.targetClass} onChange={(e) => setBatchForm({ ...batchForm, targetClass: e.target.value })} className="w-full px-3 py-2 border rounded-xl text-xs font-bold">
+                    <option value="Class 10th">Class 10th</option>
+                    <option value="Class 12th Science">Class 12th Science</option>
+                    <option value="Class 12th Commerce">Class 12th Commerce</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Batch Fee (₹)</label>
+                  <input type="number" value={batchForm.price} onChange={(e) => setBatchForm({ ...batchForm, price: Number(e.target.value) })} placeholder="Fee (₹)" className="w-full px-3 py-2 border rounded-xl text-sm" required />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Batch Timings</label>
+                  <input type="text" value={batchForm.timings} onChange={(e) => setBatchForm({ ...batchForm, timings: e.target.value })} placeholder="4:00 PM - 6:30 PM" className="w-full px-3 py-2 border rounded-xl text-xs" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">Stream / Subjects</label>
+                  <input type="text" value={batchForm.stream} onChange={(e) => setBatchForm({ ...batchForm, stream: e.target.value })} placeholder="Science (PCM / PCB)" className="w-full px-3 py-2 border rounded-xl text-xs" />
+                </div>
+              </div>
+
+              {/* Video Lecture Upload Section Inside Batch Modal */}
+              <div className="bg-amber-50/70 border border-amber-300 rounded-xl p-3.5 space-y-2.5 mt-2">
+                <p className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <Video className="w-4 h-4 text-amber-600" />
+                  {editingBatch ? 'Add New Video Lecture to this Batch (Optional)' : 'First Video Lecture for this Batch'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={batchForm.lectureSubject}
+                    onChange={(e) => setBatchForm({ ...batchForm, lectureSubject: e.target.value })}
+                    placeholder="Subject (e.g. Physics)"
+                    className="px-3 py-2 border rounded-xl text-xs bg-white"
+                  />
+                  <input
+                    type="text"
+                    value={batchForm.lectureDuration}
+                    onChange={(e) => setBatchForm({ ...batchForm, lectureDuration: e.target.value })}
+                    placeholder="Duration (e.g. 50:00)"
+                    className="px-3 py-2 border rounded-xl text-xs bg-white"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={batchForm.lectureTitle}
+                  onChange={(e) => setBatchForm({ ...batchForm, lectureTitle: e.target.value })}
+                  placeholder="Video Lecture Title (e.g. Ch 1: Light Reflection & Refraction)"
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
+                />
+                <input
+                  type="text"
+                  value={batchForm.lectureVideoUrl}
+                  onChange={(e) => setBatchForm({ ...batchForm, lectureVideoUrl: e.target.value })}
+                  placeholder="Paste YouTube Link or Direct MP4 Video URL"
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
+                />
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Or Upload Video File from Computer/Mobile:</label>
+                  <input
+                    ref={batchVideoFileInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/*"
+                    onChange={handleBatchVideoFileSelect}
+                    className="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-slate-900 file:text-amber-400 border border-slate-300 rounded-xl p-1 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowBatchModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+                <button type="submit" className="px-5 py-2.5 bg-amber-500 text-slate-950 text-xs font-extrabold rounded-xl shadow-md">Save Batch & Video</button>
+              </div>
             </form>
           </div>
         </div>
@@ -1226,7 +1836,6 @@ export default function App() {
             </div>
             <form onSubmit={(e) => {
               e.preventDefault();
-              // Yahan aap apna Admin Password set kar sakte hain (Abhi ke liye "admin123" rakha hai)
               if (adminPasswordInput === 'Arjun123') {
                 setIsAdminLoggedIn(true);
                 setShowAdminLoginModal(false);
@@ -1242,7 +1851,7 @@ export default function App() {
                 type="password" 
                 value={adminPasswordInput} 
                 onChange={(e) => setAdminPasswordInput(e.target.value)} 
-                placeholder="Admin Password (----)"
+                placeholder="Admin Password (Arjun123)"
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" 
                 required 
               />
