@@ -44,7 +44,12 @@ import {
   HelpCircle,
   Trophy,
   Video,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Radio,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Share2
 } from 'lucide-react';
 
 interface QuizQuestion {
@@ -66,6 +71,24 @@ interface Lesson {
   dppName: string;
   completed: boolean;
   quiz: QuizQuestion[];
+}
+
+interface LiveSession {
+  id: string;
+  batchId: string;
+  title: string;
+  faculty: string;
+  scheduledTime: string;
+  isLive: boolean;
+  roomName: string;
+}
+
+interface LiveChatMessage {
+  id: string;
+  sender: string;
+  text: string;
+  time: string;
+  role: 'teacher' | 'student';
 }
 
 interface SyllabusUnit {
@@ -92,6 +115,7 @@ interface Batch {
   description: string;
   syllabus: SyllabusUnit[];
   lessons: Lesson[];
+  liveSessions?: LiveSession[];
 }
 
 interface StudyMaterial {
@@ -185,6 +209,9 @@ const INITIAL_BATCHES: Batch[] = [
           { id: 'q-102', question: 'Value of (sec² 45° - tan² 45°)?', options: ['0', '1', '2', '√2'], answer: 1, solution: 'Standard trigonometric identity is equal to 1.' }
         ]
       }
+    ],
+    liveSessions: [
+      { id: 'live-10-1', batchId: 'batch-10-aarambh', title: 'Live Doubt Clearing & Important Board Questions', faculty: 'Er. Rajesh Verma', scheduledTime: 'Today, 5:00 PM', isLive: true, roomName: 'Takshashila_Aarambh_10th_Live' }
     ]
   },
   {
@@ -222,6 +249,9 @@ const INITIAL_BATCHES: Batch[] = [
           { id: 'q-121', question: 'According to Gauss Law, total electric flux through a closed surface enclosing charge q is:', options: ['q · ε0', 'q / ε0', '2q / ε0', 'Zero'], answer: 1, solution: 'Net electric flux Φ = q_enclosed / ε0.' }
         ]
       }
+    ],
+    liveSessions: [
+      { id: 'live-12-1', batchId: 'batch-12-lakshya-sci', title: 'Physics 5-Mark Derivations Special Interactive Live Class', faculty: 'Er. Saurabh Mishra', scheduledTime: 'Today, 4:00 PM', isLive: true, roomName: 'Takshashila_Lakshya_12th_Sci_Live' }
     ]
   },
   {
@@ -258,6 +288,9 @@ const INITIAL_BATCHES: Batch[] = [
           { id: 'q-12c1', question: 'In the absence of a Partnership Deed, interest on partner loan is allowed at:', options: ['10% p.a.', '6% p.a.', '12% p.a.', 'No interest'], answer: 1, solution: 'As per Indian Partnership Act 1932, it is 6% p.a.' }
         ]
       }
+    ],
+    liveSessions: [
+      { id: 'live-12-c1', batchId: 'batch-12-kautilya-com', title: 'Accountancy Cash Flow Statement Live Problem Solving', faculty: 'CA Sidharth Bansal', scheduledTime: 'Tomorrow, 5:30 PM', isLive: false, roomName: 'Takshashila_Kautilya_Commerce_Live' }
     ]
   }
 ];
@@ -296,7 +329,6 @@ const loadStorage = <T,>(key: string, fallback: T): T => {
   }
 };
 
-// Helper function to convert YouTube links to embeddable URLs
 const getYouTubeEmbedUrl = (url: string): string | null => {
   if (!url) return null;
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|shorts\/)([^#&?]*).*/;
@@ -311,7 +343,7 @@ export default function App() {
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
 
-  const [batches, setBatches] = useState<Batch[]>(() => loadStorage('takshashila_batches_v1', INITIAL_BATCHES));
+  const [batches, setBatches] = useState<Batch[]>(() => loadStorage('takshashila_batches_v2', INITIAL_BATCHES));
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>(() => loadStorage('takshashila_materials_v1', INITIAL_STUDY_MATERIALS));
   const [enrolledBatchIds, setEnrolledBatchIds] = useState<string[]>(() => loadStorage('takshashila_enrolled_v1', ['batch-12-lakshya-sci', 'batch-10-aarambh']));
   const [studentRecords, setStudentRecords] = useState<StudentRecord[]>(() => loadStorage('takshashila_students_v1', INITIAL_STUDENT_RECORDS));
@@ -321,7 +353,16 @@ export default function App() {
     { id: 'd-1', student: 'Aryan Sharma (Class 12th)', question: 'Is it compulsory to draw the Gaussian surface diagram for the 3-mark derivation in Physics?', reply: 'Er. Saurabh Mishra (HOD Physics): Yes Aryan! 1 full mark is allotted strictly for a labeled Gaussian surface diagram.', time: '15 mins ago' }
   ]));
 
-  useEffect(() => { try { localStorage.setItem('takshashila_batches_v1', JSON.stringify(batches)); } catch (e) {} }, [batches]);
+  // Live Session & Group Chat States
+  const [activeLiveSession, setActiveLiveSession] = useState<LiveSession | null>(null);
+  const [showLiveModal, setShowLiveModal] = useState(false);
+  const [liveChatMessages, setLiveChatMessages] = useState<LiveChatMessage[]>([
+    { id: 'c-1', sender: 'Er. Saurabh Mishra (Teacher)', text: 'Welcome students! Live class is active. Kripya apne doubts chat mein پوچھें।', time: '4:00 PM', role: 'teacher' },
+    { id: 'c-2', sender: 'Aryan Sharma', text: 'Sir voice and video clear hai!', time: '4:01 PM', role: 'student' }
+  ]);
+  const [liveChatInput, setLiveChatInput] = useState('');
+
+  useEffect(() => { try { localStorage.setItem('takshashila_batches_v2', JSON.stringify(batches)); } catch (e) {} }, [batches]);
   useEffect(() => { try { localStorage.setItem('takshashila_materials_v1', JSON.stringify(studyMaterials)); } catch (e) {} }, [studyMaterials]);
   useEffect(() => { try { localStorage.setItem('takshashila_enrolled_v1', JSON.stringify(enrolledBatchIds)); } catch (e) {} }, [enrolledBatchIds]);
   useEffect(() => { try { localStorage.setItem('takshashila_students_v1', JSON.stringify(studentRecords)); } catch (e) {} }, [studentRecords]);
@@ -374,7 +415,7 @@ export default function App() {
 
   const [enquiryForm, setEnquiryForm] = useState({ studentName: '', targetClass: 'Class 10th', board: 'CBSE Board', mode: 'Offline + Online Hybrid', phone: '' });
 
-  const [adminTab, setAdminTab] = useState<'batches' | 'pdfs' | 'mocktests' | 'students' | 'enquiries'>('batches');
+  const [adminTab, setAdminTab] = useState<'batches' | 'livesessions' | 'pdfs' | 'mocktests' | 'students' | 'enquiries'>('batches');
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('All');
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -393,9 +434,17 @@ export default function App() {
     lectureDuration: '55:00',
     lectureVideoUrl: ''
   });
-  const batchVideoFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Dedicated Video Upload Modal States
+  // New Live Session Schedule Form State for Admin
+  const [liveSessionForm, setLiveSessionForm] = useState({
+    batchId: 'batch-12-lakshya-sci',
+    title: '',
+    faculty: 'Er. Saurabh Mishra',
+    scheduledTime: 'Today, 5:00 PM',
+    roomName: ''
+  });
+
+  const batchVideoFileInputRef = useRef<HTMLInputElement>(null);
   const [showVideoUploadModal, setShowVideoUploadModal] = useState(false);
   const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'file'>('url');
   const [videoUploadForm, setVideoUploadForm] = useState({
@@ -413,7 +462,6 @@ export default function App() {
 
   const [pdfUploadForm, setPdfUploadForm] = useState({ title: '', targetClass: 'Class 10th', subject: 'Maths', category: 'Handwritten Notes', fileName: '', fileDataUrl: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [mcqForm, setMcqForm] = useState({ batchId: 'batch-10-aarambh', question: '', optionA: '', optionB: '', optionC: '', optionD: '', correctOption: 0, solution: '' });
 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -600,7 +648,6 @@ export default function App() {
     setShowBatchModal(true);
   };
 
-  // Handle video file selection inside Batch Create/Edit Modal
   const handleBatchVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -613,7 +660,6 @@ export default function App() {
     triggerToast(`Video File Selected: ${file.name}`);
   };
 
-  // Handle video file selection inside Dedicated Video Upload Modal
   const handleDedicatedVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -707,6 +753,72 @@ export default function App() {
     );
   };
 
+  // --- Live Session & Chat Handlers ---
+  const handleScheduleLiveSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!liveSessionForm.title.trim()) {
+      triggerToast('Kripya Live Session Title darj karein.');
+      return;
+    }
+    const newSession: LiveSession = {
+      id: `live-${Date.now()}`,
+      batchId: liveSessionForm.batchId,
+      title: liveSessionForm.title,
+      faculty: liveSessionForm.faculty || 'Er. Saurabh Mishra',
+      scheduledTime: liveSessionForm.scheduledTime || 'Today, 5:00 PM',
+      isLive: false,
+      roomName: liveSessionForm.roomName.trim() || `Takshashila_Room_${Math.floor(1000 + Math.random() * 9000)}`
+    };
+
+    setBatches((prev) =>
+      prev.map((b) => {
+        if (b.id !== liveSessionForm.batchId) return b;
+        const existingLive = b.liveSessions || [];
+        return { ...b, liveSessions: [newSession, ...existingLive] };
+      })
+    );
+
+    setLiveSessionForm({ batchId: 'batch-12-lakshya-sci', title: '', faculty: 'Er. Saurabh Mishra', scheduledTime: 'Today, 5:00 PM', roomName: '' });
+    triggerToast('Live Session Scheduled Successfully!');
+  };
+
+  const handleToggleLiveStatus = (batchId: string, sessionId: string) => {
+    setBatches((prev) =>
+      prev.map((b) => {
+        if (b.id !== batchId) return b;
+        const updatedLive = (b.liveSessions || []).map((ls) => {
+          if (ls.id === sessionId) {
+            const nextStatus = !ls.isLive;
+            triggerToast(nextStatus ? '🔴 Live Session Started!' : '⏹️ Live Session Ended.');
+            return { ...ls, isLive: nextStatus };
+          }
+          return ls;
+        });
+        return { ...b, liveSessions: updatedLive };
+      })
+    );
+  };
+
+  const handleStartLiveClass = (session: LiveSession) => {
+    setActiveLiveSession(session);
+    setShowLiveModal(true);
+    triggerToast(`Connected to Live Room: ${session.roomName}`);
+  };
+
+  const handleSendLiveChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!liveChatInput.trim()) return;
+    const newMsg: LiveChatMessage = {
+      id: `msg-${Date.now()}`,
+      sender: isAdminLoggedIn ? 'Er. Saurabh Mishra (Teacher 👨‍🏫)' : 'Aryan Sharma (Student)',
+      text: liveChatInput,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      role: isAdminLoggedIn ? 'teacher' : 'student'
+    };
+    setLiveChatMessages((prev) => [...prev, newMsg]);
+    setLiveChatInput('');
+  };
+
   const handleSaveBatch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!batchForm.title.trim()) return;
@@ -775,6 +887,9 @@ export default function App() {
             completed: false,
             quiz: [{ id: `q-${Date.now()}`, question: 'Primary book for preparation?', options: ['NCERT + PYQs', 'Magazines', 'None', 'Guides'], answer: 0, solution: 'NCERT is mandatory.' }]
           }
+        ],
+        liveSessions: [
+          { id: `live-${Date.now()}`, batchId: `batch-${Date.now()}`, title: 'Orientation & Live Batch Introduction', faculty: batchForm.lectureFaculty, scheduledTime: 'Today, 6:00 PM', isLive: true, roomName: `Takshashila_Room_${Math.floor(1000 + Math.random() * 9000)}` }
         ]
       };
       setBatches((prev) => [nb, ...prev]);
@@ -1032,7 +1147,7 @@ export default function App() {
               <div>
                 <span className="text-xs font-extrabold uppercase tracking-widest text-slate-950 bg-amber-400 px-3 py-1 rounded-full">Offline + Online Batches</span>
                 <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mt-2">Explore Coaching Batches</h2>
-                <p className="text-slate-600 mt-1 text-sm sm:text-base">Enroll to unlock video lectures, PDF notes, and live timed mock tests.</p>
+                <p className="text-slate-600 mt-1 text-sm sm:text-base">Enroll to unlock video lectures, PDF notes, live sessions, and live timed mock tests.</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative">
@@ -1067,7 +1182,7 @@ export default function App() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-bold text-slate-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-600" /> {batch.timings}</span>
-                          <span className="font-extrabold text-blue-700 bg-blue-50 px-2 py-1 rounded">{batch.lessons.length} Video Lectures</span>
+                          <span className="font-extrabold text-blue-700 bg-blue-50 px-2 py-1 rounded">{batch.lessons.length} Videos</span>
                         </div>
                         <h3 className="font-extrabold text-xl text-slate-900 leading-snug">{batch.title}</h3>
                         <p className="text-slate-600 text-sm leading-relaxed">{batch.description}</p>
@@ -1176,7 +1291,7 @@ export default function App() {
         </div>
       )}
 
-      {/* VIEW 2: STUDENT PORTAL */}
+      {/* VIEW 2: STUDENT PORTAL (With Real Live Sessions & Chat) */}
       {activeView === 'student' && (
         <div className="flex-1 flex flex-col bg-slate-950 text-slate-100">
           <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
@@ -1193,7 +1308,43 @@ export default function App() {
 
           <div className="flex-1 flex flex-col lg:flex-row">
             <main className="flex-1 flex flex-col">
-              {/* Supports both YouTube Embed and Direct/Local Video Files */}
+              {/* 🔴 LIVE SESSION BANNER & JOIN BUTTON */}
+              {activeBatch?.liveSessions && activeBatch.liveSessions.length > 0 && (
+                <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-slate-950 border-b-2 border-rose-500/80 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg animate-pulse">
+                      <Radio className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-rose-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">Live Coaching Class</span>
+                        <span className="text-xs text-amber-400 font-bold">{activeBatch.liveSessions[0].scheduledTime}</span>
+                      </div>
+                      <h3 className="font-extrabold text-base text-white mt-0.5">{activeBatch.liveSessions[0].title}</h3>
+                      <p className="text-xs text-slate-300">Faculty: {activeBatch.liveSessions[0].faculty}</p>
+                    </div>
+                  </div>
+                  <div>
+                    {activeBatch.liveSessions[0].isLive ? (
+                      <button
+                        onClick={() => handleStartLiveClass(activeBatch.liveSessions![0])}
+                        className="bg-rose-500 hover:bg-rose-600 text-white font-extrabold px-6 py-3 rounded-xl shadow-xl text-xs sm:text-sm flex items-center gap-2 animate-bounce"
+                      >
+                        <Video className="w-4 h-4" /> Join Live Class Now 🔴
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStartLiveClass(activeBatch.liveSessions![0])}
+                        className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2"
+                      >
+                        <PlayCircle className="w-4 h-4" /> Enter Waiting Room / Preview
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Video Player (YouTube or Direct File) */}
               <div className="w-full aspect-video max-h-[480px] bg-black relative flex items-center justify-center border-b border-slate-800">
                 {activeYoutubeEmbed ? (
                   <iframe
@@ -1283,7 +1434,7 @@ export default function App() {
                 <div className="flex items-center justify-between text-xs font-extrabold uppercase"><span className="text-slate-300">Course Completion</span><span className="text-amber-400">{completedCount}/{totalCount} ({progressPct}%)</span></div>
                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${progressPct}%` }} /></div>
               </div>
-              <div className="divide-y divide-slate-800 overflow-y-auto flex-1">
+              <div className="divide-y divide-slate-800 overflow-y-auto flex-1 max-h-[500px]">
                 {filteredBatchLessons.map((lesson) => {
                   const isActive = lesson.id === activeLesson?.id;
                   return (
@@ -1309,14 +1460,11 @@ export default function App() {
               <div>
                 <span className="text-xs font-extrabold uppercase tracking-widest text-amber-400">Takshashila Backend Command Center</span>
                 <h1 className="text-2xl sm:text-3xl font-extrabold mt-1">Admin Panel</h1>
-                <p className="text-slate-300 text-sm mt-0.5">Upload Batch Videos, Real PDFs, Build Mock Tests, Manage Batches & Track Fees.</p>
+                <p className="text-slate-300 text-sm mt-0.5">Schedule Live Classes, Start/End Sessions, Upload Videos, PDFs & Track Fees.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => openVideoUploadForBatch(batches[0])}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm shadow-md"
-                >
-                  <Video className="w-4 h-4" /> + Upload Batch Video
+                <button onClick={() => setAdminTab('livesessions')} className="bg-rose-500 hover:bg-rose-600 text-white font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm shadow-md">
+                  <Radio className="w-4 h-4 animate-pulse" /> + Schedule Live Class
                 </button>
                 <button onClick={() => setAdminTab('pdfs')} className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm"><Upload className="w-4 h-4" /> Upload PDF</button>
                 <button onClick={openAddBatch} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-4 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm shadow-md"><PlusCircle className="w-4 h-4" /> + New Batch</button>
@@ -1331,12 +1479,76 @@ export default function App() {
             </div>
 
             <div className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
-              <button onClick={() => setAdminTab('batches')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'batches' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>1. Batches & Video Lectures ({batches.length})</button>
-              <button onClick={() => setAdminTab('pdfs')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'pdfs' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>2. Upload PDF Notes ({studyMaterials.length})</button>
+              <button onClick={() => setAdminTab('batches')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'batches' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>1. Batches & Videos</button>
+              <button onClick={() => setAdminTab('livesessions')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap flex items-center gap-1.5 ${adminTab === 'livesessions' ? 'bg-rose-600 text-white' : 'bg-white text-slate-700 border'}`}>🔴 Live Sessions & Control</button>
+              <button onClick={() => setAdminTab('pdfs')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'pdfs' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>2. Upload PDF Notes</button>
               <button onClick={() => setAdminTab('mocktests')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'mocktests' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>3. Mock Test Builder</button>
-              <button onClick={() => setAdminTab('students')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'students' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>4. Registered Students ({studentRecords.length})</button>
-              <button onClick={() => setAdminTab('enquiries')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'enquiries' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>5. Demo Leads ({enquiries.length})</button>
+              <button onClick={() => setAdminTab('students')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'students' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>4. Registered Students</button>
+              <button onClick={() => setAdminTab('enquiries')} className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap ${adminTab === 'enquiries' ? 'bg-slate-900 text-amber-400' : 'bg-white text-slate-700 border'}`}>5. Demo Leads</button>
             </div>
+
+            {/* TAB: LIVE SESSIONS MANAGEMENT */}
+            {adminTab === 'livesessions' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <form onSubmit={handleScheduleLiveSession} className="lg:col-span-5 bg-white p-6 rounded-2xl border-2 border-rose-500 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2 text-rose-600"><Radio className="w-5 h-5 animate-pulse" /><h2 className="font-extrabold text-lg text-slate-900">Schedule New Live Class</h2></div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Select Batch *</label>
+                    <select value={liveSessionForm.batchId} onChange={(e) => setLiveSessionForm({ ...liveSessionForm, batchId: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold">
+                      {batches.map((b) => (<option key={b.id} value={b.id}>{b.targetClass} — {b.title.split(':')[0]}</option>))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Live Class Title *</label>
+                    <input type="text" value={liveSessionForm.title} onChange={(e) => setLiveSessionForm({ ...liveSessionForm, title: e.target.value })} placeholder="e.g. Physics Ch 1 Numericals & Doubts" className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-xs font-bold text-slate-700 block mb-1">Faculty Name</label><input type="text" value={liveSessionForm.faculty} onChange={(e) => setLiveSessionForm({ ...liveSessionForm, faculty: e.target.value })} className="w-full px-3.5 py-2 border rounded-xl text-xs" /></div>
+                    <div><label className="text-xs font-bold text-slate-700 block mb-1">Scheduled Time</label><input type="text" value={liveSessionForm.scheduledTime} onChange={(e) => setLiveSessionForm({ ...liveSessionForm, scheduledTime: e.target.value })} className="w-full px-3.5 py-2 border rounded-xl text-xs" /></div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Unique Jitsi / Meeting Room ID (Optional)</label>
+                    <input type="text" value={liveSessionForm.roomName} onChange={(e) => setLiveSessionForm({ ...liveSessionForm, roomName: e.target.value })} placeholder="Takshashila_Physics_Live_Room" className="w-full px-3.5 py-2 border rounded-xl text-xs font-mono" />
+                  </div>
+                  <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 rounded-xl text-sm shadow-md flex items-center justify-center gap-2"><Radio className="w-4 h-4" /> Schedule & Broadcast Live</button>
+                </form>
+
+                <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                  <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2"><Video className="w-5 h-5 text-rose-600" /> Active & Scheduled Live Sessions</h3>
+                  <div className="space-y-3">
+                    {batches.map((b) => (
+                      <div key={b.id} className="space-y-2">
+                        <span className="text-xs font-extrabold text-amber-700 uppercase bg-amber-100 px-2.5 py-0.5 rounded">{b.targetClass} — {b.title.split(':')[0]}</span>
+                        {(!b.liveSessions || b.liveSessions.length === 0) ? (
+                          <p className="text-xs text-slate-400 pl-2">No live sessions scheduled.</p>
+                        ) : (
+                          b.liveSessions.map((ls) => (
+                            <div key={ls.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  {ls.isLive ? <span className="bg-rose-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded animate-pulse">🔴 LIVE NOW</span> : <span className="bg-slate-200 text-slate-700 text-[10px] font-extrabold px-2 py-0.5 rounded">Scheduled</span>}
+                                  <span className="text-xs text-slate-500">{ls.scheduledTime}</span>
+                                </div>
+                                <h4 className="font-extrabold text-sm text-slate-900">{ls.title}</h4>
+                                <p className="text-xs text-slate-600">Faculty: {ls.faculty} • Room: {ls.roomName}</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button onClick={() => handleToggleLiveStatus(b.id, ls.id)} className={`px-3 py-2 rounded-xl text-xs font-extrabold ${ls.isLive ? 'bg-slate-900 text-white' : 'bg-rose-600 text-white'}`}>
+                                  {ls.isLive ? 'End Class ⏹️' : 'Start Class 🔴'}
+                                </button>
+                                <button onClick={() => handleStartLiveClass(ls)} className="bg-amber-500 text-slate-950 px-3 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1">
+                                  <Video className="w-3.5 h-3.5" /> Join Studio
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {adminTab === 'batches' && (
               <div className="space-y-6">
@@ -1347,7 +1559,7 @@ export default function App() {
                       <p className="text-xs text-slate-500">Har batch ke aage "+ Upload Video" button daba kar naya video lecture add karein.</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => openVideoUploadForBatch(batches[0])} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5">
+                      <button onClick={() => openVideoUploadForBatch(batches[0])} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm">
                         <Video className="w-4 h-4" /> + Upload Video Lecture
                       </button>
                       <button onClick={openAddBatch} className="bg-slate-900 text-amber-400 px-4 py-2 rounded-xl text-xs font-extrabold">+ Add Batch</button>
@@ -1379,10 +1591,7 @@ export default function App() {
                             </td>
                             <td className="py-4 px-5 font-extrabold">₹{b.price.toLocaleString('en-IN')}</td>
                             <td className="py-4 px-5 text-right space-x-2 whitespace-nowrap">
-                              <button
-                                onClick={() => openVideoUploadForBatch(b)}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-extrabold inline-flex items-center gap-1 shadow-sm"
-                              >
+                              <button onClick={() => openVideoUploadForBatch(b)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-extrabold inline-flex items-center gap-1 shadow-sm">
                                 <Video className="w-3.5 h-3.5" /> + Upload Video
                               </button>
                               <button onClick={() => openEditBatch(b)} className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-extrabold inline-flex items-center gap-1"><Edit className="w-3.5 h-3.5" /> Edit</button>
@@ -1392,49 +1601,6 @@ export default function App() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-
-                {/* Batch-wise Uploaded Video Lectures List */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                  <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
-                    <PlayCircle className="w-5 h-5 text-amber-500" /> All Uploaded Batch Video Lectures
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {batches.map((b) => (
-                      <div key={b.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                          <div>
-                            <span className="text-[10px] font-extrabold uppercase text-amber-600 block">{b.targetClass}</span>
-                            <h4 className="font-extrabold text-sm text-slate-900 line-clamp-1">{b.title.split(':')[0]}</h4>
-                          </div>
-                          <button
-                            onClick={() => openVideoUploadForBatch(b)}
-                            className="text-xs font-extrabold bg-slate-900 text-amber-400 px-2.5 py-1 rounded-lg"
-                          >
-                            + Add Video
-                          </button>
-                        </div>
-                        <div className="space-y-2 max-h-56 overflow-y-auto">
-                          {b.lessons.map((l, idx) => (
-                            <div key={l.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-start justify-between gap-2 text-xs">
-                              <div className="min-w-0">
-                                <span className="text-[10px] font-extrabold text-blue-700 uppercase">{l.subject} • {l.duration}</span>
-                                <p className="font-bold text-slate-900 truncate">{idx + 1}. {l.title}</p>
-                                <p className="text-[11px] text-slate-500 truncate">{l.faculty}</p>
-                              </div>
-                              <button
-                                onClick={() => handleDeleteLesson(b.id, l.id)}
-                                className="text-rose-500 hover:text-rose-700 p-1 shrink-0"
-                                title="Delete Video"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -1497,6 +1663,81 @@ export default function App() {
                 <div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="bg-slate-900 text-amber-400 text-xs uppercase"><th className="py-3.5 px-5">Student</th><th className="py-3.5 px-5">Class & Board</th><th className="py-3.5 px-5">Phone</th><th className="py-3.5 px-5">Status</th></tr></thead><tbody className="divide-y divide-slate-200 text-sm">{enquiries.map((enq) => (<tr key={enq.id} className="hover:bg-slate-50"><td className="py-4 px-5 font-extrabold">{enq.studentName}</td><td className="py-4 px-5"><span className="bg-slate-900 text-amber-400 text-xs px-2 py-0.5 rounded">{enq.targetClass}</span> {enq.board}</td><td className="py-4 px-5 font-bold text-blue-900">{enq.phone}</td><td className="py-4 px-5"><button onClick={() => cycleEnquiry(enq.id)} className="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800">{enq.status} ↻</button></td></tr>))}</tbody></table></div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 LIVE CLASS & GROUP CHAT MODAL (Jitsi Meet IFrame & Realtime Chat) */}
+      {showLiveModal && activeLiveSession && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col lg:flex-row overflow-hidden">
+          {/* Left: Video Conference Room (Jitsi Meet IFrame Integrated) */}
+          <div className="flex-1 flex flex-col bg-black relative">
+            <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-rose-400 block">Live Meeting Room</span>
+                  <h3 className="font-extrabold text-sm">{activeLiveSession.title}</h3>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-slate-800 px-3 py-1 rounded-lg text-amber-400 font-mono">Room: {activeLiveSession.roomName}</span>
+                <button
+                  onClick={() => {
+                    setShowLiveModal(false);
+                    setActiveLiveSession(null);
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-lg flex items-center gap-1 shadow"
+                >
+                  <PhoneOff className="w-4 h-4" /> Leave Room
+                </button>
+              </div>
+            </div>
+
+            {/* Embedded Live Video Conference Interface */}
+            <div className="flex-1 relative bg-slate-950 flex items-center justify-center">
+              <iframe
+                src={`https://meet.jit.si/${activeLiveSession.roomName}#config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.DEFAULT_BACKGROUND=%230f172a`}
+                title="Takshashila Live Classroom"
+                className="w-full h-full border-0"
+                allow="camera; microphone; fullscreen; display-capture; autoplay"
+              />
+            </div>
+          </div>
+
+          {/* Right: Live Group Chat & Doubts Panel */}
+          <div className="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col h-[40vh] lg:h-full">
+            <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <h4 className="font-extrabold text-sm text-amber-400 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" /> Live Class Group Chat
+              </h4>
+              <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">🟢 Realtime</span>
+            </div>
+
+            <div className="flex-1 p-4 overflow-y-auto space-y-3">
+              {liveChatMessages.map((msg) => (
+                <div key={msg.id} className={`p-3 rounded-xl text-xs space-y-1 ${msg.role === 'teacher' ? 'bg-amber-500/15 border border-amber-500/40 text-amber-200' : 'bg-slate-800 text-slate-200'}`}>
+                  <div className="flex items-center justify-between font-extrabold">
+                    <span className={msg.role === 'teacher' ? 'text-amber-400' : 'text-blue-300'}>{msg.sender}</span>
+                    <span className="text-[10px] text-slate-400">{msg.time}</span>
+                  </div>
+                  <p className="leading-relaxed">{msg.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleSendLiveChat} className="p-3 bg-slate-950 border-t border-slate-800 flex gap-2">
+              <input
+                type="text"
+                value={liveChatInput}
+                onChange={(e) => setLiveChatInput(e.target.value)}
+                placeholder="Ask doubt in live chat..."
+                className="flex-1 px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white outline-none focus:border-amber-400"
+              />
+              <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center">
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
           </div>
         </div>
       )}
@@ -1577,161 +1818,76 @@ export default function App() {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-2 border-emerald-500 text-slate-950 my-8">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
-                  <Video className="w-5 h-5" />
-                </div>
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700"><Video className="w-5 h-5" /></div>
                 <div>
                   <h3 className="text-lg font-extrabold">Upload Video Lecture to Batch</h3>
                   <p className="text-xs text-slate-500">Video upload hote hi Student Portal mein dikhega</p>
                 </div>
               </div>
-              <button onClick={() => setShowVideoUploadModal(false)} className="text-slate-400 hover:text-slate-700">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => setShowVideoUploadModal(false)} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleUploadLectureToBatch} className="space-y-3.5">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Select Batch *</label>
-                <select
-                  value={videoUploadForm.batchId}
-                  onChange={(e) => setVideoUploadForm({ ...videoUploadForm, batchId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-extrabold bg-slate-50"
-                >
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.targetClass} — {b.title}
-                    </option>
-                  ))}
+                <select value={videoUploadForm.batchId} onChange={(e) => setVideoUploadForm({ ...videoUploadForm, batchId: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-extrabold bg-slate-50">
+                  {batches.map((b) => (<option key={b.id} value={b.id}>{b.targetClass} — {b.title}</option>))}
                 </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Subject *</label>
-                  <input
-                    type="text"
-                    value={videoUploadForm.subject}
-                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, subject: e.target.value })}
-                    placeholder="e.g. Physics, Maths, Accounts"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold"
-                    required
-                  />
+                  <input type="text" value={videoUploadForm.subject} onChange={(e) => setVideoUploadForm({ ...videoUploadForm, subject: e.target.value })} placeholder="e.g. Physics, Maths" className="w-full px-3 py-2 border rounded-xl text-xs font-bold" required />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Faculty Name</label>
-                  <input
-                    type="text"
-                    value={videoUploadForm.faculty}
-                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, faculty: e.target.value })}
-                    placeholder="e.g. Er. Saurabh Mishra"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
-                  />
+                  <input type="text" value={videoUploadForm.faculty} onChange={(e) => setVideoUploadForm({ ...videoUploadForm, faculty: e.target.value })} placeholder="Er. Saurabh Mishra" className="w-full px-3 py-2 border rounded-xl text-xs" />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1">Lecture Title *</label>
-                  <input
-                    type="text"
-                    value={videoUploadForm.title}
-                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, title: e.target.value })}
-                    placeholder="e.g. Ch 3: Current Electricity - Kirchoff Law"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm"
-                    required
-                  />
+                  <input type="text" value={videoUploadForm.title} onChange={(e) => setVideoUploadForm({ ...videoUploadForm, title: e.target.value })} placeholder="Ch 3: Current Electricity" className="w-full px-3.5 py-2 border rounded-xl text-sm" required />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Duration</label>
-                  <input
-                    type="text"
-                    value={videoUploadForm.duration}
-                    onChange={(e) => setVideoUploadForm({ ...videoUploadForm, duration: e.target.value })}
-                    placeholder="45:00"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
-                  />
+                  <input type="text" value={videoUploadForm.duration} onChange={(e) => setVideoUploadForm({ ...videoUploadForm, duration: e.target.value })} placeholder="45:00" className="w-full px-3 py-2 border rounded-xl text-xs" />
                 </div>
               </div>
 
-              {/* Video Source Selector */}
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-extrabold text-slate-800">Choose Video Upload Method:</label>
+                  <label className="text-xs font-extrabold text-slate-800">Choose Video Source:</label>
                   <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setVideoUploadMode('url')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 ${
-                        videoUploadMode === 'url' ? 'bg-slate-900 text-amber-400' : 'bg-white border text-slate-600'
-                      }`}
-                    >
-                      <LinkIcon className="w-3 h-3" /> YouTube / Video Link
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVideoUploadMode('file')}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 ${
-                        videoUploadMode === 'file' ? 'bg-slate-900 text-amber-400' : 'bg-white border text-slate-600'
-                      }`}
-                    >
-                      <Upload className="w-3 h-3" /> Select Video File
-                    </button>
+                    <button type="button" onClick={() => setVideoUploadMode('url')} className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 ${videoUploadMode === 'url' ? 'bg-slate-900 text-amber-400' : 'bg-white border text-slate-600'}`}><LinkIcon className="w-3 h-3" /> Link / URL</button>
+                    <button type="button" onClick={() => setVideoUploadMode('file')} className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold flex items-center gap-1 ${videoUploadMode === 'file' ? 'bg-slate-900 text-amber-400' : 'bg-white border text-slate-600'}`}><Upload className="w-3 h-3" /> Select File</button>
                   </div>
                 </div>
 
                 {videoUploadMode === 'url' ? (
                   <div>
-                    <input
-                      type="url"
-                      value={videoUploadForm.videoUrl}
-                      onChange={(e) => setVideoUploadForm({ ...videoUploadForm, videoUrl: e.target.value })}
-                      placeholder="Paste YouTube URL (https://youtu.be/...) or Direct .mp4 link"
-                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-white"
-                    />
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Tip: YouTube Unlisted/Public link ya direct MP4 video link paste karein.
-                    </p>
+                    <input type="url" value={videoUploadForm.videoUrl} onChange={(e) => setVideoUploadForm({ ...videoUploadForm, videoUrl: e.target.value })} placeholder="YouTube URL or .mp4 link" className="w-full px-3.5 py-2.5 border rounded-xl text-xs bg-white" />
                   </div>
                 ) : (
                   <div>
-                    <input
-                      ref={dedicatedVideoFileRef}
-                      type="file"
-                      accept="video/mp4,video/webm,video/*"
-                      onChange={handleDedicatedVideoFileSelect}
-                      className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-600 file:text-white border border-slate-300 rounded-xl p-1.5 bg-white"
-                    />
-                    {videoUploadForm.videoFileName && (
-                      <p className="text-xs font-bold text-emerald-700 mt-1.5">
-                        ✓ Selected Video: {videoUploadForm.videoFileName}
-                      </p>
-                    )}
+                    <input ref={dedicatedVideoFileRef} type="file" accept="video/mp4,video/webm,video/*" onChange={handleDedicatedVideoFileSelect} className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-600 file:text-white border rounded-xl p-1.5 bg-white" />
+                    {videoUploadForm.videoFileName && (<p className="text-xs font-bold text-emerald-700 mt-1.5">✓ Selected Video: {videoUploadForm.videoFileName}</p>)}
                   </div>
                 )}
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowVideoUploadModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-extrabold rounded-xl shadow-md flex items-center gap-1.5"
-                >
-                  <Upload className="w-4 h-4" /> Publish Video to Batch
-                </button>
+                <button type="button" onClick={() => setShowVideoUploadModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+                <button type="submit" className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-extrabold rounded-xl shadow-md flex items-center gap-1.5"><Upload className="w-4 h-4" /> Publish Video to Batch</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Admin Batch Modal (Enhanced with Video Upload Support) */}
+      {/* Admin Batch Modal */}
       {showBatchModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border-2 border-amber-500 text-slate-950 my-8">
@@ -1769,51 +1925,20 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Video Lecture Upload Section Inside Batch Modal */}
               <div className="bg-amber-50/70 border border-amber-300 rounded-xl p-3.5 space-y-2.5 mt-2">
                 <p className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
                   <Video className="w-4 h-4 text-amber-600" />
                   {editingBatch ? 'Add New Video Lecture to this Batch (Optional)' : 'First Video Lecture for this Batch'}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={batchForm.lectureSubject}
-                    onChange={(e) => setBatchForm({ ...batchForm, lectureSubject: e.target.value })}
-                    placeholder="Subject (e.g. Physics)"
-                    className="px-3 py-2 border rounded-xl text-xs bg-white"
-                  />
-                  <input
-                    type="text"
-                    value={batchForm.lectureDuration}
-                    onChange={(e) => setBatchForm({ ...batchForm, lectureDuration: e.target.value })}
-                    placeholder="Duration (e.g. 50:00)"
-                    className="px-3 py-2 border rounded-xl text-xs bg-white"
-                  />
+                  <input type="text" value={batchForm.lectureSubject} onChange={(e) => setBatchForm({ ...batchForm, lectureSubject: e.target.value })} placeholder="Subject (e.g. Physics)" className="px-3 py-2 border rounded-xl text-xs bg-white" />
+                  <input type="text" value={batchForm.lectureDuration} onChange={(e) => setBatchForm({ ...batchForm, lectureDuration: e.target.value })} placeholder="Duration (e.g. 50:00)" className="px-3 py-2 border rounded-xl text-xs bg-white" />
                 </div>
-                <input
-                  type="text"
-                  value={batchForm.lectureTitle}
-                  onChange={(e) => setBatchForm({ ...batchForm, lectureTitle: e.target.value })}
-                  placeholder="Video Lecture Title (e.g. Ch 1: Light Reflection & Refraction)"
-                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                />
-                <input
-                  type="text"
-                  value={batchForm.lectureVideoUrl}
-                  onChange={(e) => setBatchForm({ ...batchForm, lectureVideoUrl: e.target.value })}
-                  placeholder="Paste YouTube Link or Direct MP4 Video URL"
-                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                />
+                <input type="text" value={batchForm.lectureTitle} onChange={(e) => setBatchForm({ ...batchForm, lectureTitle: e.target.value })} placeholder="Video Lecture Title" className="w-full px-3 py-2 border rounded-xl text-xs bg-white" />
+                <input type="text" value={batchForm.lectureVideoUrl} onChange={(e) => setBatchForm({ ...batchForm, lectureVideoUrl: e.target.value })} placeholder="YouTube Link or Direct MP4 URL" className="w-full px-3 py-2 border rounded-xl text-xs bg-white" />
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Or Upload Video File from Computer/Mobile:</label>
-                  <input
-                    ref={batchVideoFileInputRef}
-                    type="file"
-                    accept="video/mp4,video/webm,video/*"
-                    onChange={handleBatchVideoFileSelect}
-                    className="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-slate-900 file:text-amber-400 border border-slate-300 rounded-xl p-1 bg-white"
-                  />
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Or Upload Video File:</label>
+                  <input ref={batchVideoFileInputRef} type="file" accept="video/mp4,video/webm,video/*" onChange={handleBatchVideoFileSelect} className="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-extrabold file:bg-slate-900 file:text-amber-400 border rounded-xl p-1 bg-white" />
                 </div>
               </div>
 
@@ -1847,17 +1972,8 @@ export default function App() {
               }
             }} className="space-y-3.5">
               <p className="text-xs text-slate-300">Admin panel access karne ke liye password darj karein:</p>
-              <input 
-                type="password" 
-                value={adminPasswordInput} 
-                onChange={(e) => setAdminPasswordInput(e.target.value)} 
-                placeholder="Admin Password (Arjun123)"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" 
-                required 
-              />
-              <button type="submit" className="w-full text-slate-950 font-extrabold py-3 rounded-xl text-sm bg-amber-500 hover:bg-amber-400 transition">
-                Login as Admin
-              </button>
+              <input type="password" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} placeholder="Admin Password (Arjun123)" className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" required />
+              <button type="submit" className="w-full text-slate-950 font-extrabold py-3 rounded-xl text-sm bg-amber-500 hover:bg-amber-400 transition">Login as Admin</button>
             </form>
           </div>
         </div>
