@@ -1904,7 +1904,7 @@ export default function App() {
               }
             }} className="space-y-3.5">
               <p className="text-xs text-slate-300">Admin panel access karne ke liye password darj karein:</p>
-              <input type="password" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} placeholder="Admin Password (Arjun123)" className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" required />
+              <input type="password" value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} placeholder="Admin Password (.)" className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-amber-400" required />
               <button type="submit" className="w-full text-slate-950 font-extrabold py-3 rounded-xl text-sm bg-amber-500 hover:bg-amber-400 transition">Login as Admin</button>
             </form>
           </div>
